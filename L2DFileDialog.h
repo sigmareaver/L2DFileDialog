@@ -16,7 +16,6 @@
 
 #pragma once
 
-
 #include <imgui_docking/imgui.h>
 #include <imgui_docking/imgui_internal.h>
 #include <chrono>
@@ -38,10 +37,10 @@ namespace FileDialog {
 		None
 	};
 
-	static bool file_dialog_open = false;
+	//static bool file_dialog_open = false;
 	static FileDialogType file_dialog_open_type = FileDialogType::OpenFile;
 
-	void ShowFileDialog(bool* open, std::string& buffer, unsigned int buffer_size, FileDialogType type = FileDialogType::OpenFile) {
+	bool ShowFileDialog(bool* open, std::filesystem::path& path, FileDialogType type = FileDialogType::OpenFile) {
 		static int file_dialog_file_select_index = 0;
 		static int file_dialog_folder_select_index = 0;
 		static std::string file_dialog_current_path = std::filesystem::current_path().string();
@@ -52,16 +51,16 @@ namespace FileDialog {
 		static FileDialogSortOrder size_sort_order = FileDialogSortOrder::None;
 		static FileDialogSortOrder date_sort_order = FileDialogSortOrder::None;
 		static FileDialogSortOrder type_sort_order = FileDialogSortOrder::None;
-
 		static bool initial_path_set = false;
+		bool ret_val = false;
 
-		if (open) {
+		//if (open && *open) {
 			// Check if there was already something in the buffer. If so, try to use that path (if it exists).
 			// If it doesn't exist, just put them into the current path.
-			if (!initial_path_set && buffer.length() > 0) {
-				std::filesystem::path path{buffer};
+			if (!initial_path_set && path.string().length() > 0) {
+				//std::filesystem::path path{buffer};
 				if (std::filesystem::is_directory(path)) {
-					file_dialog_current_path = buffer;
+					file_dialog_current_path = path.string();
 				}
 				else {
 					// Check if this is just a file in a real path. If so, use the real path.
@@ -227,10 +226,16 @@ namespace FileDialog {
 				ImGui::NextColumn();
 				auto ftime = files[i].last_write_time();
 				auto st = std::chrono::time_point_cast<std::chrono::system_clock::duration>(ftime - decltype(ftime)::clock::now() + std::chrono::system_clock::now());
-				std::time_t tt = std::chrono::system_clock::to_time_t(st);
-				std::tm* mt = std::localtime(&tt);
 				std::stringstream ss;
+				std::time_t tt = std::chrono::system_clock::to_time_t(st);
+#ifdef __STDC_WANT_SECURE_LIB__
+				std::tm mt;
+				localtime_s(&mt, &tt);
+				ss << std::put_time(&mt, "%F %R");
+#else
+				std::tm* mt = localtime(&tt);
 				ss << std::put_time(mt, "%F %R");
+#endif
 				ImGui::TextUnformatted(ss.str().c_str());
 				ImGui::NextColumn();
 			}
@@ -314,11 +319,14 @@ namespace FileDialog {
 				file_dialog_current_file = "";
 				strcpy_s(file_dialog_error, "");
 				initial_path_set = false;
-				file_dialog_open = false;
+				if (open)
+					*open = false;
+				//file_dialog_open = false;
 			};
 
 			if (ImGui::Button("Cancel")) {
 				reset_everything();
+				ret_val = false;
 			}
 			ImGui::SameLine();
 			if (ImGui::Button("Choose")) {
@@ -327,10 +335,11 @@ namespace FileDialog {
 						strcpy_s(file_dialog_error, "Error: You must select a folder!");
 					}
 					else {
-						buffer = file_dialog_current_path + (file_dialog_current_path.back() == '\\' ? "" : "\\") + file_dialog_current_folder;
+						path = file_dialog_current_path + (file_dialog_current_path.back() == '\\' ? "" : "\\") + file_dialog_current_folder;
 						//strcpy(buffer, (file_dialog_current_path + (file_dialog_current_path.back() == '\\' ? "" : "\\") + file_dialog_current_folder).c_str());
 						strcpy_s(file_dialog_error, "");
 						reset_everything();
+						ret_val = true;
 					}
 				}
 				else if (type == FileDialogType::OpenFile) {
@@ -338,10 +347,11 @@ namespace FileDialog {
 						strcpy_s(file_dialog_error, "Error: You must select a file!");
 					}
 					else {
-						buffer = file_dialog_current_path + (file_dialog_current_path.back() == '\\' ? "" : "\\") + file_dialog_current_file;
+						path = file_dialog_current_path + (file_dialog_current_path.back() == '\\' ? "" : "\\") + file_dialog_current_file;
 						//strcpy(buffer, (file_dialog_current_path + (file_dialog_current_path.back() == '\\' ? "" : "\\") + file_dialog_current_file).c_str());
 						strcpy_s(file_dialog_error, "");
 						reset_everything();
+						ret_val = true;
 					}
 				}
 			}
@@ -351,8 +361,8 @@ namespace FileDialog {
 			}
 
 			ImGui::End();
-		}
+		//}
+		return ret_val;
 	}
 
 }
-
